@@ -6,12 +6,17 @@ URL = "https://www.enforcementtracker.com/"
 
 def get_fines():
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
+        browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-gpu"])
         page = browser.new_page()
-        page.goto(URL, timeout=60000)
-        page.wait_for_selector("table#enforcementtable", timeout=60000, state="visible")
 
-        soup = BeautifulSoup(page.content(), "html.parser")
+        print("Navigating to enforcement tracker...")
+        page.goto(URL, timeout=60000)
+        page.wait_for_load_state("networkidle")  # wait for all JS requests to settle
+        page.wait_for_timeout(5000)  # additional safety buffer: wait 5s after rendering
+
+        print("Getting page content...")
+        html = page.content()
+        soup = BeautifulSoup(html, "html.parser")
         rows = soup.select("table#enforcementtable tbody tr")
 
         fines = []
@@ -26,6 +31,7 @@ def get_fines():
                     "summary": cols[4].text.strip(),
                     "link": cols[4].find("a")["href"] if cols[4].find("a") else ""
                 })
+
         browser.close()
         return fines
 
