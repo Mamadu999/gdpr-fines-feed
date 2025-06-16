@@ -5,11 +5,17 @@ on:
   schedule:
     - cron: '0 0 * * *'  # Every day at midnight
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -23,7 +29,7 @@ jobs:
       - name: Run scraper
         run: python scrape_fines.py
 
-      - name: Upload artifact
+      - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v2
         with:
           path: ./public
@@ -31,9 +37,6 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
