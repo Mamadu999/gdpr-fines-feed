@@ -6,11 +6,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-      pages: write
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -18,39 +13,42 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
-          pip install playwright
+          pip install playwright beautifulsoup4
           playwright install chromium
-          pip install beautifulsoup4
 
       - name: Run scraper
-        run: python scrape_fines.py
-
-      - name: Copy output to site directory
         run: |
-          mkdir -p public
-          mv gdpr_fines.json public/
+          python scrape_fines.py
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2
+      - name: Upload JSON artifact
+        uses: actions/upload-artifact@v4
         with:
-          path: ./public
+          name: gdpr_fines
+          path: public/gdpr_fines.json
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pages: write
       id-token: write
-
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: public
+
       - name: Deploy to GitHub Pages
-        id: deployment
         uses: actions/deploy-pages@v2
