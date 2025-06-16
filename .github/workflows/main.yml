@@ -3,14 +3,14 @@ name: GDPR Fines JSON Feed
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pages: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -22,24 +22,35 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install playwright beautifulsoup4
+          pip install playwright
           playwright install chromium
+          pip install beautifulsoup4
 
       - name: Run scraper
         run: python scrape_fines.py
 
+      - name: Copy output to site directory
+        run: |
+          mkdir -p public
+          mv gdpr_fines.json public/
+
       - name: Upload artifact
-      - uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v2
         with:
           path: ./public
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v2
