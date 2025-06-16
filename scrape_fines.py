@@ -1,50 +1,55 @@
+from playwright.sync_api import sync_playwright
 import json
 import time
-from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright, TimeoutError
-
-URL = "https://www.enforcementtracker.com/"
 
 def get_fines():
+    url = "https://www.enforcementtracker.com/"
+    print("🔄 Launching browser...")
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-
-        print("Navigating to Enforcement Tracker...")
-        page.goto(URL, wait_until="networkidle", timeout=120000)
+        print("🌐 Navigating to Enforcement Tracker...")
+        page.goto(url, timeout=120000)
 
         try:
             page.wait_for_selector("table#enforcementtable", timeout=90000, state="visible")
-        except TimeoutError:
-            print("❌ TimeoutError: enforcement table not found.")
-            with open("page_snapshot.html", "w", encoding="utf-8") as snapshot:
-                snapshot.write(page.content())
-            browser.close()
-            raise RuntimeError("Table not found on Enforcement Tracker. See page_snapshot.html for HTML dump.")
+            print("✅ Table found, scraping...")
 
-        print("✅ Table loaded. Parsing content...")
-        soup = BeautifulSoup(page.content(), "html.parser")
-        rows = soup.select("table#enforcementtable tbody tr")
-
-        fines = []
-        for row in rows:
-            cols = row.find_all("td")
-            if len(cols) >= 5:
-                fines.append({
-                    "date": cols[0].text.strip(),
-                    "company": cols[1].text.strip(),
-                    "country": cols[2].text.strip(),
-                    "amount": cols[3].text.strip().replace("€", "").replace(",", ""),
-                    "summary": cols[4].text.strip(),
-                    "link": cols[4].find("a")["href"] if cols[4].find("a") else ""
-                })
+            # JavaScript to extract all data
+            data = page.evaluate("""
+                () => {
+                    const rows = Array.from(document.querySelectorAll("table#enforcementtable tbody tr"));
+                    return rows.map(row => {
+                        const cells = row.querySelectorAll("td");
+                        return {
+                            date: cells[0]?.innerText.trim(),
+                            country: cells[1]?.innerText.trim(),
+                            authority: cells[2]?.innerText.trim(),
+                            company: cells[3]?.innerText.trim(),
+                            sector: cells[4]?.innerText.trim(),
+                            fine: cells[5]?.innerText.trim(),
+                            summary: cells[6]?.innerText.trim(),
+                            link: row.querySelector("a")?.href || null
+                        };
+                    });
+                }
+            """)
+            print(f"📊 Scraped {len(data)} fine records.")
+        except Exception as e:
+            print(f"❌ Timeout or error: {str(e)}")
+            print("🩺 Saving full page snapshot for debugging...")
+            html = page.content()
+            with open("page_snapshot.html", "w", encoding="utf-8") as f:
+                f.write(html)
+            raise RuntimeError("⚠️ Table not found. Snapshot saved to page_snapshot.html.")
 
         browser.close()
-        return fines
+        return data
 
 if __name__ == "__main__":
-    print("⚙️ Starting scrape...")
+    print("⚙️ Starting GDPR fines scrape...")
     fines = get_fines()
-    print(f"✅ Scraped {len(fines)} fines.")
     with open("gdpr_fines.json", "w", encoding="utf-8") as f:
-        json.dump(fines, f, indent=2)
+        json.dump(fines, f, indent=2, ensure_ascii=False)
+    print("✅ Done. Data saved to gdpr_fines.json.")
