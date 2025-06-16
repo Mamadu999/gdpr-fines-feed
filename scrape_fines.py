@@ -1,24 +1,28 @@
 import json
+import time
 from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, TimeoutError
 
 URL = "https://www.enforcementtracker.com/"
 
 def get_fines():
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
-        # ✅ Navigate to page and wait until network is idle
-        page.goto(URL, wait_until="networkidle")
+        print("Navigating to Enforcement Tracker...")
+        page.goto(URL, wait_until="networkidle", timeout=120000)
 
-        # ✅ Give JS a moment to hydrate the page content
-        page.wait_for_timeout(5000)  # wait 5 seconds explicitly
+        try:
+            page.wait_for_selector("table#enforcementtable", timeout=90000, state="visible")
+        except TimeoutError:
+            print("❌ TimeoutError: enforcement table not found.")
+            with open("page_snapshot.html", "w", encoding="utf-8") as snapshot:
+                snapshot.write(page.content())
+            browser.close()
+            raise RuntimeError("Table not found on Enforcement Tracker. See page_snapshot.html for HTML dump.")
 
-        # ✅ Wait for the table to appear with extended timeout
-        page.wait_for_selector("table#enforcementtable", timeout=90000)
-
-        # ✅ Parse table contents using BeautifulSoup
+        print("✅ Table loaded. Parsing content...")
         soup = BeautifulSoup(page.content(), "html.parser")
         rows = soup.select("table#enforcementtable tbody tr")
 
@@ -38,6 +42,9 @@ def get_fines():
         browser.close()
         return fines
 
-# ✅ Write to JSON file
-with open("gdpr_fines.json", "w") as f:
-    json.dump(get_fines(), f, indent=2)
+if __name__ == "__main__":
+    print("⚙️ Starting scrape...")
+    fines = get_fines()
+    print(f"✅ Scraped {len(fines)} fines.")
+    with open("gdpr_fines.json", "w", encoding="utf-8") as f:
+        json.dump(fines, f, indent=2)
