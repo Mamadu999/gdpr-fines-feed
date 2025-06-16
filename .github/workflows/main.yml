@@ -12,26 +12,24 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
           pip install playwright beautifulsoup4
           playwright install chromium
 
-      - name: Run scraper script
+      - name: Run scraper
         run: |
           python scrape_fines.py
-          mkdir -p public
-          mv gdpr_fines.json public/
 
-      - name: Upload artifact for deployment (ONLY v4)
+      - name: Upload artifact (v4)
         uses: actions/upload-artifact@v4
         with:
           name: site
@@ -40,15 +38,17 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
     steps:
-      - name: Download artifact (ONLY v4)
+      - name: Download artifact (v4)
         uses: actions/download-artifact@v4
         with:
           name: site
           path: public/
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
+        id: deploy
+        uses: actions/deploy-pages@v2
