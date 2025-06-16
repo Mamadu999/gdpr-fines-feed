@@ -4,20 +4,15 @@ on:
   workflow_dispatch:
 
 permissions:
+  contents: read
   pages: write
   id-token: write
-  contents: read
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -27,31 +22,33 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install beautifulsoup4 playwright
+          pip install playwright beautifulsoup4
           playwright install chromium
 
-      - name: Scrape GDPR fines
+      - name: Run scraper script
         run: |
           python scrape_fines.py
           mkdir -p public
           mv gdpr_fines.json public/
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload pages artifact
-        uses: actions/upload-pages-artifact@v2
+      - name: Upload artifact for deployment (ONLY v4)
+        uses: actions/upload-artifact@v4
         with:
-          path: ./public
+          name: site
+          path: public/
 
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
-
     steps:
+      - name: Download artifact (ONLY v4)
+        uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: public/
+
       - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v2
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
