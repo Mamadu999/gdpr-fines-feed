@@ -2,8 +2,6 @@ name: GDPR Fines JSON Feed
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * *'
 
 permissions:
   contents: read
@@ -20,7 +18,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: 3.11
 
       - name: Install dependencies
         run: |
@@ -30,10 +28,10 @@ jobs:
       - name: Run scraper
         run: python scrape_fines.py
 
-      - name: Copy output to site directory
-        run: |
-          mkdir -p _site
-          cp -r public/* _site/
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./public
 
   deploy:
     needs: build
@@ -44,4 +42,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4
