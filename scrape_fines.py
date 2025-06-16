@@ -6,17 +6,11 @@ URL = "https://www.enforcementtracker.com/"
 
 def get_fines():
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-gpu"])
+        browser = p.chromium.launch()
         page = browser.new_page()
-
-        print("Navigating to enforcement tracker...")
-        page.goto(URL, timeout=60000)
-        page.wait_for_load_state("networkidle")  # wait for all JS requests to settle
-        page.wait_for_timeout(5000)  # additional safety buffer: wait 5s after rendering
-
-        print("Getting page content...")
-        html = page.content()
-        soup = BeautifulSoup(html, "html.parser")
+        page.goto(URL)
+        page.wait_for_selector("table#enforcementtable", timeout=60000)
+        soup = BeautifulSoup(page.content(), "html.parser")
         rows = soup.select("table#enforcementtable tbody tr")
 
         fines = []
@@ -27,7 +21,7 @@ def get_fines():
                     "date": cols[0].text.strip(),
                     "company": cols[1].text.strip(),
                     "country": cols[2].text.strip(),
-                    "amount": cols[3].text.strip().replace("€", "").replace(",", ""),
+                    "amount": cols[3].text.strip().replace("€", "").replace(",", "").strip(),
                     "summary": cols[4].text.strip(),
                     "link": cols[4].find("a")["href"] if cols[4].find("a") else ""
                 })
@@ -35,5 +29,7 @@ def get_fines():
         browser.close()
         return fines
 
-with open("public/gdpr_fines.json", "w") as f:
-    json.dump(get_fines(), f, indent=2)
+if __name__ == "__main__":
+    fines = get_fines()
+    with open("gdpr_fines.json", "w", encoding="utf-8") as f:
+        json.dump(fines, f, indent=2, ensure_ascii=False)
