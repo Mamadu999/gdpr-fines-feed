@@ -6,10 +6,11 @@ URL = "https://www.enforcementtracker.com/"
 
 def get_fines():
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
         page = browser.new_page()
-        page.goto(URL)
-        page.wait_for_selector("table#enforcementtable")
+        page.goto(URL, timeout=60000)
+        page.wait_for_selector("table#enforcementtable", timeout=60000, state="visible")
+
         soup = BeautifulSoup(page.content(), "html.parser")
         rows = soup.select("table#enforcementtable tbody tr")
 
