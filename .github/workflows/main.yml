@@ -1,7 +1,9 @@
-name: GDPR Fines JSON Feed
+name: GDPR Fines Scraper & Deploy
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1' # Runs every Monday at 03:00 UTC
 
 jobs:
   build:
@@ -15,20 +17,25 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           pip install playwright beautifulsoup4
           playwright install chromium
 
-      - name: Run scraper
+      - name: Run scraper script
         run: |
           python scrape_fines.py
 
-      - name: Upload JSON artifact
+      - name: Prepare output directory
+        run: |
+          mkdir -p public
+          mv gdpr_fines.json public/
+
+      - name: Upload artifact (v4)
         uses: actions/upload-artifact@v4
         with:
-          name: gdpr_fines
-          path: public/gdpr_fines.json
+          name: fines-artifact
+          path: public
 
   deploy:
     needs: build
@@ -40,15 +47,21 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Upload Pages artifact
+      - name: Download artifact (v4)
+        uses: actions/download-artifact@v4
+        with:
+          name: fines-artifact
+          path: public
+
+      - name: Upload to GitHub Pages
         uses: actions/upload-pages-artifact@v2
         with:
           path: public
 
       - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v2
