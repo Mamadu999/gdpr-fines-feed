@@ -1,9 +1,12 @@
-name: GDPR Fines Scraper & Deploy
+name: GDPR Fines JSON Feed
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 3 * * 1' # Runs every Monday at 03:00 UTC
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   build:
@@ -15,53 +18,37 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: 3.11
 
       - name: Install Python dependencies
         run: |
-          pip install playwright beautifulsoup4
+          pip install beautifulsoup4 playwright
           playwright install chromium
 
       - name: Run scraper script
-        run: |
-          python scrape_fines.py
+        run: python scrape_fines.py
 
       - name: Prepare output directory
         run: |
           mkdir -p public
-          mv gdpr_fines.json public/
+          if [ -f gdpr_fines.json ]; then
+            mv gdpr_fines.json public/
+          else
+            echo "❌ gdpr_fines.json not found. Scraper might have failed." && exit 1
+          fi
 
       - name: Upload artifact (v4)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-pages-artifact@v2
         with:
-          name: fines-artifact
           path: public
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download artifact (v4)
-        uses: actions/download-artifact@v4
-        with:
-          name: fines-artifact
-          path: public
-
-      - name: Upload to GitHub Pages
-        uses: actions/upload-pages-artifact@v2
-        with:
-          path: public
-
       - name: Deploy to GitHub Pages
-        id: deployment
         uses: actions/deploy-pages@v2
